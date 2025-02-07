@@ -1,26 +1,153 @@
 'use client';
 
-import { useState } from 'react';
-import { DEFAULT_BOARD_SIZE, BOARD_COLORS } from '@/constants/game';
+import { useState, useEffect } from 'react';
+import { DEFAULT_BOARD_SIZE, BOARD_COLORS, INITIAL_GAME_SETTINGS } from '@/constants/game';
 import { cn } from '@/lib/utils';
 import { getValidMoves, shouldPromoteToKing } from '@/lib/game-utils';
 import GamePiece from './GamePiece';
-import type { Piece, Position, Move } from '@/types/game';
+import TutorialOverlay from './TutorialOverlay';
+import GameSettings from './GameSettings';
+import type { Piece, Position, Move, PlayerColor, GameSettings as GameSettingsType } from '@/types/game';
+
+interface GameState {
+  pieces: Piece[];
+  currentPlayer: PlayerColor;
+  isCapturing: boolean;
+}
+
+const TUTORIAL_SHOWN_KEY = 'dam-haji-tutorial-shown';
+const SETTINGS_KEY = 'dam-haji-settings';
 
 const GameBoard = () => {
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState<GameSettingsType>(INITIAL_GAME_SETTINGS);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
-  const [currentPlayer, setCurrentPlayer] = useState<'black' | 'white'>('black');
+  const [currentPlayer, setCurrentPlayer] = useState<PlayerColor>('black');
   const [validMoves, setValidMoves] = useState<Move[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [gameStatus, setGameStatus] = useState<'playing' | 'finished'>('playing');
+  const [winner, setWinner] = useState<PlayerColor | null>(null);
+  
+  // Add move history for undo
+  const [moveHistory, setMoveHistory] = useState<GameState[]>([]);
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
 
-  // Generate initial pieces for both players
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (e) {
+        console.error('Failed to parse saved settings:', e);
+      }
+    }
+
+    const tutorialShown = localStorage.getItem(TUTORIAL_SHOWN_KEY);
+    if (!tutorialShown) {
+      setShowTutorial(true);
+    }
+  }, []);
+
+  // Save settings to localStorage
+  const handleSettingsChange = (newSettings: GameSettingsType) => {
+    setSettings(newSettings);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+  };
+
+  // Update tutorial completion in localStorage
+  const handleTutorialComplete = () => {
+    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
+    setShowTutorial(false);
+  };
+
+  // Reset game function
+  const handleNewGame = () => {
+    setPieces(generateInitialPieces());
+    setCurrentPlayer('black');
+    setSelectedPiece(null);
+    setValidMoves([]);
+    setIsCapturing(false);
+    setGameStatus('playing');
+    setWinner(null);
+    setMoveHistory([]);
+    setCurrentMoveIndex(-1);
+  };
+
+  // Undo move function
+  const handleUndo = () => {
+    if (currentMoveIndex > -1) {
+      const previousState = moveHistory[currentMoveIndex];
+      setPieces(previousState.pieces);
+      setCurrentPlayer(previousState.currentPlayer);
+      setIsCapturing(previousState.isCapturing);
+      setSelectedPiece(null);
+      setValidMoves([]);
+      setCurrentMoveIndex(currentMoveIndex - 1);
+      setGameStatus('playing');
+      setWinner(null);
+    }
+  };
+
+  // Save game state after each move
+  const saveGameState = () => {
+    const newState: GameState = {
+      pieces: [...pieces],
+      currentPlayer,
+      isCapturing,
+    };
+    
+    // Remove any future states if we undid and then made a new move
+    const newHistory = moveHistory.slice(0, currentMoveIndex + 1);
+    setMoveHistory([...newHistory, newState]);
+    setCurrentMoveIndex(currentMoveIndex + 1);
+  };
+
+  // Check for win conditions
+  const checkWinCondition = (pieces: Piece[], nextPlayer: PlayerColor) => {
+    // Count pieces for each player
+    const blackPieces = pieces.filter(p => p.color === 'black');
+    const whitePieces = pieces.filter(p => p.color === 'white');
+
+    // Check if any player has no pieces left
+    if (blackPieces.length === 0) {
+      setGameStatus('finished');
+      setWinner('white');
+      return true;
+    }
+    if (whitePieces.length === 0) {
+      setGameStatus('finished');
+      setWinner('black');
+      return true;
+    }
+
+    // Check if next player has any valid moves
+    const playerPieces = pieces.filter(p => p.color === nextPlayer);
+    const hasAnyValidMoves = playerPieces.some(piece => {
+      const moves = getValidMoves(piece, pieces);
+      return moves.length > 0;
+    });
+
+    if (!hasAnyValidMoves) {
+      setGameStatus('finished');
+      setWinner(nextPlayer === 'black' ? 'white' : 'black');
+      return true;
+    }
+
+    return false;
+  };
+
+  // Update generateInitialPieces to use settings
   const generateInitialPieces = (): Piece[] => {
     const pieces: Piece[] = [];
+    const rowsPerSide = Math.ceil(settings.piecesPerPlayer / (settings.boardSize / 2));
 
     // Generate black pieces at the top
-    for (let row = 0; row < 3; row++) {
+    for (let row = 0; row < rowsPerSide; row++) {
       const startCol = row % 2 === 0 ? 1 : 0;
-      for (let col = startCol; col < DEFAULT_BOARD_SIZE; col += 2) {
+      for (let col = startCol; col < settings.boardSize; col += 2) {
+        if (pieces.filter(p => p.color === 'black').length >= settings.piecesPerPlayer) break;
         pieces.push({
           id: `black-${row}-${col}`,
           color: 'black',
@@ -31,9 +158,10 @@ const GameBoard = () => {
     }
 
     // Generate white (red) pieces at the bottom
-    for (let row = 5; row < 8; row++) {
+    for (let row = settings.boardSize - rowsPerSide; row < settings.boardSize; row++) {
       const startCol = row % 2 === 0 ? 1 : 0;
-      for (let col = startCol; col < DEFAULT_BOARD_SIZE; col += 2) {
+      for (let col = startCol; col < settings.boardSize; col += 2) {
+        if (pieces.filter(p => p.color === 'white').length >= settings.piecesPerPlayer) break;
         pieces.push({
           id: `white-${row}-${col}`,
           color: 'white',
@@ -81,8 +209,8 @@ const GameBoard = () => {
     console.log('Selected piece:', selectedPiece);
     console.log('Valid moves:', validMoves);
 
-    if (!selectedPiece) {
-      console.log('No piece selected');
+    if (gameStatus === 'finished' || !selectedPiece) {
+      console.log('Game is finished or no piece selected');
       return;
     }
 
@@ -127,6 +255,7 @@ const GameBoard = () => {
     }
 
     setPieces(updatedPieces);
+    saveGameState(); // Save state after the move
 
     // Check for additional captures
     const updatedPiece = updatedPieces.find(p => p.id === selectedPiece.id)!;
@@ -146,7 +275,12 @@ const GameBoard = () => {
       setSelectedPiece(null);
       setValidMoves([]);
       setIsCapturing(false);
-      setCurrentPlayer(currentPlayer === 'black' ? 'white' : 'black');
+      const nextPlayer = currentPlayer === 'black' ? 'white' : 'black';
+      
+      // Check for win condition before changing turn
+      if (!checkWinCondition(updatedPieces, nextPlayer)) {
+        setCurrentPlayer(nextPlayer);
+      }
     }
   };
 
@@ -200,13 +334,136 @@ const GameBoard = () => {
     return board;
   };
 
+  // Get game statistics
+  const getGameStats = () => {
+    const blackPieces = pieces.filter(p => p.color === 'black');
+    const whitePieces = pieces.filter(p => p.color === 'white');
+    const blackKings = blackPieces.filter(p => p.isKing).length;
+    const whiteKings = whitePieces.filter(p => p.isKing).length;
+
+    return {
+      black: {
+        total: blackPieces.length,
+        kings: blackKings,
+        captured: 12 - blackPieces.length,
+      },
+      white: {
+        total: whitePieces.length,
+        kings: whiteKings,
+        captured: 12 - whitePieces.length,
+      },
+    };
+  };
+
   return (
-    <div className="inline-block rounded-sm border-4 border-black dark:border-neutral-800 bg-black dark:bg-neutral-900">
-      <div className="mb-4 text-center text-lg font-bold">
-        Current Player: {currentPlayer}
-        {isCapturing && " (Must continue capturing)"}
+    <div className="inline-block">
+      {showTutorial && (
+        <TutorialOverlay onComplete={handleTutorialComplete} />
+      )}
+      
+      {showSettings && (
+        <GameSettings
+          settings={settings}
+          onSettingsChange={handleSettingsChange}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {/* Game Controls */}
+      <div className="mb-4 flex justify-center gap-4">
+        <button
+          onClick={handleNewGame}
+          className="px-4 py-2 rounded-md bg-neutral-700 hover:bg-neutral-600 text-white font-medium"
+        >
+          New Game
+        </button>
+        <button
+          onClick={handleUndo}
+          disabled={currentMoveIndex === -1}
+          className={cn(
+            "px-4 py-2 rounded-md font-medium",
+            currentMoveIndex === -1
+              ? "bg-neutral-800 text-neutral-600 cursor-not-allowed"
+              : "bg-neutral-700 hover:bg-neutral-600 text-white"
+          )}
+        >
+          Undo Move
+        </button>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="px-4 py-2 rounded-md bg-neutral-700 hover:bg-neutral-600 text-white font-medium"
+        >
+          Settings
+        </button>
       </div>
-      {renderBoard()}
+
+      <div className="mb-6 grid grid-cols-3 gap-4 text-center">
+        {/* Black player stats */}
+        <div className={cn(
+          'p-3 rounded-lg',
+          currentPlayer === 'black' ? 'bg-neutral-800 ring-2 ring-yellow-400' : 'bg-neutral-700'
+        )}>
+          <div className="font-bold mb-1">Black</div>
+          <div className="text-sm">
+            Pieces: {getGameStats().black.total}
+            {getGameStats().black.kings > 0 && ` (${getGameStats().black.kings} Kings)`}
+          </div>
+          <div className="text-sm text-red-400">
+            Captured: {getGameStats().black.captured}
+          </div>
+        </div>
+
+        {/* Game status */}
+        <div className="p-3 bg-neutral-800 rounded-lg">
+          {gameStatus === 'finished' ? (
+            <div className="text-xl text-yellow-400 font-bold">
+              Game Over!<br/>
+              {winner === 'black' ? 'Black' : 'Red'} Wins!
+            </div>
+          ) : (
+            <>
+              <div className="font-bold mb-1">
+                {currentPlayer === 'black' ? 'Black' : 'Red'}&apos;s Turn
+              </div>
+              <div className="text-sm">
+                {isCapturing ? (
+                  <span className="text-yellow-400">Must continue capturing!</span>
+                ) : (
+                  'Waiting for move...'
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* White (Red) player stats */}
+        <div className={cn(
+          'p-3 rounded-lg',
+          currentPlayer === 'white' ? 'bg-neutral-800 ring-2 ring-yellow-400' : 'bg-neutral-700'
+        )}>
+          <div className="font-bold mb-1">Red</div>
+          <div className="text-sm">
+            Pieces: {getGameStats().white.total}
+            {getGameStats().white.kings > 0 && ` (${getGameStats().white.kings} Kings)`}
+          </div>
+          <div className="text-sm text-red-400">
+            Captured: {getGameStats().white.captured}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-sm border-4 border-black dark:border-neutral-800 bg-black dark:bg-neutral-900">
+        {renderBoard()}
+      </div>
+
+      {!showTutorial && (
+        <button
+          onClick={() => setShowTutorial(true)}
+          className="mt-4 px-4 py-2 text-sm text-neutral-400 hover:text-neutral-200"
+        >
+          Show Tutorial
+        </button>
+      )}
     </div>
   );
 };
