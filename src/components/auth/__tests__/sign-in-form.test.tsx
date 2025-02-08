@@ -1,29 +1,44 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@/test/test-utils'
 import { SignInForm } from '../sign-in-form'
-import { useSupabase } from '@/components/providers/supabase-provider'
+
+const mockSupabase = {
+  auth: {
+    signInWithOtp: vi.fn(),
+    signUp: vi.fn(),
+  },
+}
+
+const mockRouter = {
+  push: vi.fn(),
+  refresh: vi.fn(),
+}
 
 // Mock the useSupabase hook
 vi.mock('@/components/providers/supabase-provider', () => ({
-  useSupabase: vi.fn(() => ({
-    supabase: {
-      auth: {
-        signInWithOtp: vi.fn(),
-        signUp: vi.fn(),
-      },
-    },
-  })),
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useSupabase: () => ({
+    supabase: mockSupabase,
+    user: null,
+    loading: false,
+  }),
 }))
 
 // Mock the useRouter hook
 vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(() => ({
-    push: vi.fn(),
-    refresh: vi.fn(),
-  })),
+  useRouter: () => mockRouter,
+}))
+
+// Mock the toast
+vi.mock('@/components/ui/use-toast', () => ({
+  toast: vi.fn(),
 }))
 
 describe('SignInForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders email input and buttons', () => {
     render(<SignInForm />)
     
@@ -33,15 +48,8 @@ describe('SignInForm', () => {
   })
 
   it('handles email sign in', async () => {
-    const mockSignInWithOtp = vi.fn().mockResolvedValue({ error: null })
-    const useSupabaseMock = useSupabase as unknown as ReturnType<typeof vi.fn>
-    useSupabaseMock.mockImplementation(() => ({
-      supabase: {
-        auth: {
-          signInWithOtp: mockSignInWithOtp,
-        },
-      },
-    }))
+    const { toast } = await import('@/components/ui/use-toast')
+    mockSupabase.auth.signInWithOtp.mockResolvedValueOnce({ error: null })
 
     render(<SignInForm />)
     
@@ -52,25 +60,24 @@ describe('SignInForm', () => {
     fireEvent.click(signInButton)
 
     await waitFor(() => {
-      expect(mockSignInWithOtp).toHaveBeenCalledWith({
+      expect(mockSupabase.auth.signInWithOtp).toHaveBeenCalledWith({
         email: 'test@example.com',
         options: {
           emailRedirectTo: expect.any(String),
         },
       })
     })
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith({
+        title: 'Check your email',
+        description: 'We sent you a login link. Be sure to check your spam folder.',
+      })
+    })
   })
 
   it('handles guest sign in', async () => {
-    const mockSignUp = vi.fn().mockResolvedValue({ data: { user: { id: '123' } }, error: null })
-    const useSupabaseMock = useSupabase as unknown as ReturnType<typeof vi.fn>
-    useSupabaseMock.mockImplementation(() => ({
-      supabase: {
-        auth: {
-          signUp: mockSignUp,
-        },
-      },
-    }))
+    mockSupabase.auth.signUp.mockResolvedValueOnce({ data: { user: { id: '123' } }, error: null })
 
     render(<SignInForm />)
     
@@ -78,7 +85,7 @@ describe('SignInForm', () => {
     fireEvent.click(guestButton)
 
     await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalledWith({
+      expect(mockSupabase.auth.signUp).toHaveBeenCalledWith({
         email: expect.stringContaining('@guest.damhaji.com'),
         password: expect.any(String),
         options: {
@@ -88,6 +95,10 @@ describe('SignInForm', () => {
           },
         },
       })
+    })
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith('/game')
     })
   })
 }) 
