@@ -1,0 +1,132 @@
+---
+description: project requirement - PRD
+globs: 
+---
+Dam Haji Web Application Product Requirements Document (PRD)
+Table of Contents
+Introduction and Overview
+Vision and Objectives
+3. Stakeholders and Target Audience
+Scope
+Product Features and Requirements
+Game Mechanics
+User Experience & UI
+User Account and Profiles
+Multiplayer and Tournament Features
+Administrative Dashboard
+Analytics and Reporting
+Technical Requirements and Architecture
+Framework and Technologies
+Frontend Architecture
+Backend Architecture & APIs
+Database and Storage
+Real-time Communication
+Security and Authentication
+Milestones and Timeline
+Assumptions, Risks, and Mitigations
+Appendices and References
+---
+Introduction and Overview
+Purpose: This document details the requirements for the Dam Haji web application—a digital adaptation of the traditional Malaysian board game similar to checkers.
+Background: The game, known locally for its strategic depth and cultural significance, is now being reimagined as an interactive web application using Next.js.
+Summary: The web app should enable players to play the game online (single-player and multiplayer modes), participate in tournaments, and track leaderboards while preserving the traditional game rules.
+Vision and Objectives
+Vision: To create an engaging, culturally rich online platform that faithfully adapts the traditional Dam Haji board game while leveraging modern web technologies.
+Objectives:
+Provide an intuitive interface replicating the real-life game experience.
+Support multiple modes: casual play, competitive tournaments, and learning modules.
+Ensure scalability and responsiveness with Next.js.
+Enhance community engagement with built-in social and competitive features.
+Stakeholders and Target Audience
+Stakeholders:
+Game organizers and administrators.
+Competitive players and community leaders.
+Casual players interested in local cultural games.
+Target Audience:
+Local communities familiar with the traditional board game.
+New players curious about strategy board games.
+Esports and board game enthusiasts.
+Scope
+In-Scope:
+Web-based gameplay (gameboard UI, player interactions, game rule enforcement).
+Multiplayer functionality (real-time or asynchronous play).
+User accounts and profile management.
+Tournament management and leaderboard integration.
+Out-of-Scope:
+Native mobile apps.
+Extensive AI gameplay (for initial release).
+Offline play.
+Product Features and Requirements
+Game Mechanics
+Rule Enforcement: Accurately implement mandatory capture rules and movement logic.
+Board Representation: A digital board reflecting the traditional checkered layout.
+Animations: Visual feedback on moves, jumps, and captures.
+User Experience & UI
+Responsive Design: Ensure a consistent experience on desktops, tablets, and smartphones.
+Intuitive Layout: Clear indication of active players, available moves, and game status.
+Tutorial Mode: Guided instructions for new users.
+User Account and Profiles
+Authentication: Secure login via email/social media.
+Profile Management: User profiles including game statistics, rankings, and historical performance.
+Social Integration: Option to share achievements and challenge friends.
+Multiplayer and Tournament Features
+Matchmaking: Option for real-time gameplay or asynchronous challenges.
+Tournaments: Organized events with brackets, leaderboards, and tracking of wins/losses.
+Ranking System: Elo-like scoring to rank players and add competitive depth.
+Administrative Dashboard
+Game Monitoring: Tools for organizers to manage tournaments, monitor game sessions, and review reports.
+Content Management: Update game rules, event notifications, and announcements.
+User Management: Manage user reports, bans, and feedback.
+Analytics and Reporting
+Usage Analytics: Track user engagement, match statistics, and game duration.
+Performance Metrics: Monitor server performance and latency metrics, especially for real-time games.
+Technical Requirements and Architecture
+Framework and Technologies
+Frontend: Next.js (React framework) for server-side rendering and route optimization.
+Backend: Node.js server with RESTful API endpoints; possible use of WebSockets for real-time gameplay.
+Database: Options like PostgreSQL or MongoDB for persistent user and game data.
+Hosting/Deployment: Vercel (for Next.js) or another scalable cloud provider.
+Frontend Architecture
+Component-Based Design: Reusable UI components for the board, pieces, menus, etc.
+Routing: Next.js dynamic routing for game rooms, profiles, and dashboards.
+State Management: Context API or Redux for managing game state and user sessions.
+Backend Architecture & APIs
+API Endpoints: Endpoints for game management, user authentication, tournament handling, etc.
+Real-Time Communication: Integrate WebSockets (or frameworks like Socket.io) for real-time updates.
+Microservices: Consider a microservices approach for scalability if the need arises.
+Database and Storage
+User Data: Store profile information, game statistics, and rankings.
+Game State: Persist current game state and historical match data.
+Security: Ensure encryption at rest and in transit.
+Real-time Communication
+WebSockets/Socket.io: Used for real-time gameplay, updates, and notifications.
+Security and Authentication
+Authentication: Implement JWT for securing API routes.
+Data Validation: Sanitize inputs and validate user moves on the server.
+Compliance: Follow best practices for data privacy and security.
+Milestones and Timeline
+Phase 1 – Requirements and Design: Finalize PRD and design prototypes.
+Phase 2 – Core Development (MVP): Develop game board and core mechanics.
+Phase 3 – Multiplayer and Tournament Features: Integrate multiplayer communication and create tournament modules.
+Phase 4 – Testing and QA: Rigorous testing including usability, unit tests, and integration tests.
+Phase 5 – Launch and Feedback Loop: Deploy MVP, gather user feedback, and plan iterative improvements.
+Assumptions, Risks, and Mitigations
+Assumptions:
+Users have basic familiarity with web-based board games.
+Initial load will be moderate and can scale with proper cloud infrastructure.
+Risks:
+Real-time communication latency issues.
+Security vulnerabilities with user data.
+Mitigations:
+Use proven libraries and frameworks.
+Conduct regular security audits and performance tests.
+Appendices and References
+References:
+Wikipedia - Dam
+Additional Next.js documentation and board game design resources.
+Appendices:
+Wireframe sketches
+API specification documents
+User journey maps
+--------------------------------------------------
+Please review the above PRD structure. Let me know if you'd like any changes or additional details before I create the file.
