@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { DEFAULT_BOARD_SIZE, BOARD_COLORS, INITIAL_GAME_SETTINGS } from '@/constants/game';
+import { BOARD_COLORS, INITIAL_GAME_SETTINGS } from '@/constants/game';
 import { cn } from '@/lib/utils';
 import { getValidMoves, shouldPromoteToKing } from '@/lib/game-utils';
 import GamePiece from './GamePiece';
@@ -22,16 +22,20 @@ const GameBoard = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<GameSettingsType>(INITIAL_GAME_SETTINGS);
+  const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<Piece | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<PlayerColor>('black');
   const [validMoves, setValidMoves] = useState<Move[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
   const [gameStatus, setGameStatus] = useState<'playing' | 'finished'>('playing');
   const [winner, setWinner] = useState<PlayerColor | null>(null);
-  
-  // Add move history for undo
   const [moveHistory, setMoveHistory] = useState<GameState[]>([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+
+  // Initialize pieces whenever settings change
+  useEffect(() => {
+    setPieces(generateInitialPieces(settings));
+  }, [settings]);
 
   // Load settings from localStorage
   useEffect(() => {
@@ -54,17 +58,8 @@ const GameBoard = () => {
   const handleSettingsChange = (newSettings: GameSettingsType) => {
     setSettings(newSettings);
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
-  };
-
-  // Update tutorial completion in localStorage
-  const handleTutorialComplete = () => {
-    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
-    setShowTutorial(false);
-  };
-
-  // Reset game function
-  const handleNewGame = () => {
-    setPieces(generateInitialPieces());
+    
+    // Reset the game state
     setCurrentPlayer('black');
     setSelectedPiece(null);
     setValidMoves([]);
@@ -73,6 +68,25 @@ const GameBoard = () => {
     setWinner(null);
     setMoveHistory([]);
     setCurrentMoveIndex(-1);
+  };
+
+  // Reset game function
+  const handleNewGame = () => {
+    setPieces(generateInitialPieces(settings));
+    setCurrentPlayer('black');
+    setSelectedPiece(null);
+    setValidMoves([]);
+    setIsCapturing(false);
+    setGameStatus('playing');
+    setWinner(null);
+    setMoveHistory([]);
+    setCurrentMoveIndex(-1);
+  };
+
+  // Update tutorial completion in localStorage
+  const handleTutorialComplete = () => {
+    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
+    setShowTutorial(false);
   };
 
   // Undo move function
@@ -125,7 +139,7 @@ const GameBoard = () => {
     // Check if next player has any valid moves
     const playerPieces = pieces.filter(p => p.color === nextPlayer);
     const hasAnyValidMoves = playerPieces.some(piece => {
-      const moves = getValidMoves(piece, pieces);
+      const moves = getValidMoves(piece, pieces, settings.mandatoryCapture, settings.boardSize);
       return moves.length > 0;
     });
 
@@ -138,16 +152,16 @@ const GameBoard = () => {
     return false;
   };
 
-  // Update generateInitialPieces to use settings
-  const generateInitialPieces = (): Piece[] => {
+  // Update generateInitialPieces to accept settings parameter
+  const generateInitialPieces = (gameSettings: GameSettingsType = settings): Piece[] => {
     const pieces: Piece[] = [];
-    const rowsPerSide = Math.ceil(settings.piecesPerPlayer / (settings.boardSize / 2));
+    const rowsPerSide = Math.ceil(gameSettings.piecesPerPlayer / (gameSettings.boardSize / 2));
 
     // Generate black pieces at the top
     for (let row = 0; row < rowsPerSide; row++) {
       const startCol = row % 2 === 0 ? 1 : 0;
-      for (let col = startCol; col < settings.boardSize; col += 2) {
-        if (pieces.filter(p => p.color === 'black').length >= settings.piecesPerPlayer) break;
+      for (let col = startCol; col < gameSettings.boardSize; col += 2) {
+        if (pieces.filter(p => p.color === 'black').length >= gameSettings.piecesPerPlayer) break;
         pieces.push({
           id: `black-${row}-${col}`,
           color: 'black',
@@ -158,10 +172,10 @@ const GameBoard = () => {
     }
 
     // Generate white (red) pieces at the bottom
-    for (let row = settings.boardSize - rowsPerSide; row < settings.boardSize; row++) {
+    for (let row = gameSettings.boardSize - rowsPerSide; row < gameSettings.boardSize; row++) {
       const startCol = row % 2 === 0 ? 1 : 0;
-      for (let col = startCol; col < settings.boardSize; col += 2) {
-        if (pieces.filter(p => p.color === 'white').length >= settings.piecesPerPlayer) break;
+      for (let col = startCol; col < gameSettings.boardSize; col += 2) {
+        if (pieces.filter(p => p.color === 'white').length >= gameSettings.piecesPerPlayer) break;
         pieces.push({
           id: `white-${row}-${col}`,
           color: 'white',
@@ -173,8 +187,6 @@ const GameBoard = () => {
 
     return pieces;
   };
-
-  const [pieces, setPieces] = useState<Piece[]>(generateInitialPieces());
 
   const getPieceAtPosition = (row: number, col: number): Piece | undefined => {
     return pieces.find(
@@ -199,7 +211,7 @@ const GameBoard = () => {
     }
 
     setSelectedPiece(piece);
-    const moves = getValidMoves(piece, pieces);
+    const moves = getValidMoves(piece, pieces, settings.mandatoryCapture, settings.boardSize);
     console.log('Valid moves:', moves);
     setValidMoves(moves);
   };
@@ -231,7 +243,7 @@ const GameBoard = () => {
         const shouldPromote = shouldPromoteToKing({
           ...p,
           position: move.to
-        });
+        }, settings.boardSize);
         return {
           ...p,
           position: move.to,
@@ -259,7 +271,7 @@ const GameBoard = () => {
 
     // Check for additional captures
     const updatedPiece = updatedPieces.find(p => p.id === selectedPiece.id)!;
-    const additionalCaptures = getValidMoves(updatedPiece, updatedPieces, true);
+    const additionalCaptures = getValidMoves(updatedPiece, updatedPieces, true, settings.boardSize);
     console.log('Additional captures:', additionalCaptures);
 
     // Only continue capturing if there are actual capture moves available
@@ -293,24 +305,39 @@ const GameBoard = () => {
     const piece = getPieceAtPosition(row, col);
     const isValidMoveSquare = isValidMove(row, col);
 
+    // Calculate square size based on board size
+    const squareSize = {
+      6: 'w-24 h-24',
+      8: 'w-20 h-20',
+      10: 'w-16 h-16'
+    }[settings.boardSize];
+
+    const pieceSize = {
+      6: 'w-20 h-20',
+      8: 'w-16 h-16',
+      10: 'w-14 h-14'
+    }[settings.boardSize];
+
     return (
       <div
         key={`${row}-${col}`}
         onClick={() => handleSquareClick({ row, col })}
         className={cn(
-          'w-16 h-16 flex items-center justify-center relative',
+          squareSize,
+          'flex items-center justify-center relative',
           isBlackSquare ? BOARD_COLORS.DARK : BOARD_COLORS.LIGHT,
           isValidMoveSquare && 'cursor-pointer'
         )}
       >
         {isValidMoveSquare && (
-          <div className="absolute w-4 h-4 rounded-full bg-yellow-400 opacity-50" />
+          <div className="absolute w-6 h-6 rounded-full bg-yellow-400 opacity-50" />
         )}
         {piece && (
           <GamePiece
             piece={piece}
             isSelected={selectedPiece?.id === piece.id}
             onClick={() => handlePieceClick(piece)}
+            size={pieceSize}
           />
         )}
       </div>
@@ -320,9 +347,9 @@ const GameBoard = () => {
   const renderBoard = () => {
     const board = [];
     // Render rows in reverse order to flip the board
-    for (let row = DEFAULT_BOARD_SIZE - 1; row >= 0; row--) {
+    for (let row = settings.boardSize - 1; row >= 0; row--) {
       const rowSquares = [];
-      for (let col = 0; col < DEFAULT_BOARD_SIZE; col++) {
+      for (let col = 0; col < settings.boardSize; col++) {
         rowSquares.push(renderSquare(row, col));
       }
       board.push(
@@ -345,12 +372,12 @@ const GameBoard = () => {
       black: {
         total: blackPieces.length,
         kings: blackKings,
-        captured: 12 - blackPieces.length,
+        captured: settings.piecesPerPlayer - blackPieces.length,
       },
       white: {
         total: whitePieces.length,
         kings: whiteKings,
-        captured: 12 - whitePieces.length,
+        captured: settings.piecesPerPlayer - whitePieces.length,
       },
     };
   };
@@ -366,6 +393,7 @@ const GameBoard = () => {
           settings={settings}
           onSettingsChange={handleSettingsChange}
           onClose={() => setShowSettings(false)}
+          onNewGame={handleNewGame}
         />
       )}
 
@@ -397,13 +425,13 @@ const GameBoard = () => {
         </button>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-4 text-center">
+      <div className="mb-6 flex justify-center gap-4">
         {/* Black player stats */}
         <div className={cn(
-          'p-3 rounded-lg',
+          'w-[160px] p-4 rounded-lg flex flex-col items-center',
           currentPlayer === 'black' ? 'bg-neutral-800 ring-2 ring-yellow-400' : 'bg-neutral-700'
         )}>
-          <div className="font-bold mb-1">Black</div>
+          <div className="font-bold text-lg mb-2">Black</div>
           <div className="text-sm">
             Pieces: {getGameStats().black.total}
             {getGameStats().black.kings > 0 && ` (${getGameStats().black.kings} Kings)`}
@@ -414,34 +442,34 @@ const GameBoard = () => {
         </div>
 
         {/* Game status */}
-        <div className="p-3 bg-neutral-800 rounded-lg">
+        <div className="w-[160px] p-4 bg-neutral-800 rounded-lg flex flex-col items-center justify-center">
           {gameStatus === 'finished' ? (
-            <div className="text-xl text-yellow-400 font-bold">
+            <div className="text-xl text-yellow-400 font-bold text-center">
               Game Over!<br/>
               {winner === 'black' ? 'Black' : 'Red'} Wins!
             </div>
           ) : (
-            <>
-              <div className="font-bold mb-1">
+            <div className="flex flex-col items-center space-y-1">
+              <div className="font-bold text-lg">
                 {currentPlayer === 'black' ? 'Black' : 'Red'}&apos;s Turn
               </div>
-              <div className="text-sm">
+              <div className="text-sm text-center">
                 {isCapturing ? (
-                  <span className="text-yellow-400">Must continue capturing!</span>
+                  <span className="text-yellow-400 font-medium">Must continue capturing!</span>
                 ) : (
                   'Waiting for move...'
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
 
         {/* White (Red) player stats */}
         <div className={cn(
-          'p-3 rounded-lg',
+          'w-[160px] p-4 rounded-lg flex flex-col items-center',
           currentPlayer === 'white' ? 'bg-neutral-800 ring-2 ring-yellow-400' : 'bg-neutral-700'
         )}>
-          <div className="font-bold mb-1">Red</div>
+          <div className="font-bold text-lg mb-2">Red</div>
           <div className="text-sm">
             Pieces: {getGameStats().white.total}
             {getGameStats().white.kings > 0 && ` (${getGameStats().white.kings} Kings)`}
@@ -453,7 +481,16 @@ const GameBoard = () => {
       </div>
 
       <div className="rounded-sm border-4 border-black dark:border-neutral-800 bg-black dark:bg-neutral-900">
-        {renderBoard()}
+        <div className={cn(
+          'grid place-items-center',
+          {
+            6: 'w-[576px] h-[576px]',
+            8: 'w-[640px] h-[640px]',
+            10: 'w-[640px] h-[640px]'
+          }[settings.boardSize]
+        )}>
+          {renderBoard()}
+        </div>
       </div>
 
       {!showTutorial && (

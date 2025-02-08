@@ -1,13 +1,12 @@
 import type { Piece, Position, Move } from '@/types/game';
-import { DEFAULT_BOARD_SIZE } from '@/constants/game';
 
 // Check if a position is within the board boundaries
-export const isValidPosition = (position: Position): boolean => {
+export const isValidPosition = (position: Position, boardSize: number): boolean => {
   return (
     position.row >= 0 &&
-    position.row < DEFAULT_BOARD_SIZE &&
+    position.row < boardSize &&
     position.col >= 0 &&
-    position.col < DEFAULT_BOARD_SIZE
+    position.col < boardSize
   );
 };
 
@@ -25,7 +24,8 @@ export const getPieceAtPosition = (
 // Get normal moves (non-capture moves)
 const getNormalMoves = (
   piece: Piece,
-  pieces: Piece[]
+  pieces: Piece[],
+  boardSize: number
 ): Move[] => {
   const moves: Move[] = [];
   const directions = piece.isKing
@@ -40,7 +40,7 @@ const getNormalMoves = (
       col: piece.position.col + colDir,
     };
 
-    if (isValidPosition(movePosition) && !getPieceAtPosition(movePosition, pieces)) {
+    if (isValidPosition(movePosition, boardSize) && !getPieceAtPosition(movePosition, pieces)) {
       moves.push({ from: piece.position, to: movePosition });
     }
   });
@@ -53,6 +53,7 @@ const getCapturesFromPosition = (
   position: Position,
   piece: Piece,
   pieces: Piece[],
+  boardSize: number,
   capturedPositions: Position[] = []
 ): Move[] => {
   const captures: Move[] = [];
@@ -73,7 +74,7 @@ const getCapturesFromPosition = (
       col: position.col + colDir * 2,
     };
 
-    if (isValidPosition(landingPos)) {
+    if (isValidPosition(landingPos, boardSize)) {
       const jumpOverPiece = getPieceAtPosition(jumpOver, pieces);
       const landingPiece = getPieceAtPosition(landingPos, pieces);
 
@@ -105,6 +106,7 @@ const getCapturesFromPosition = (
               pos => pos.row === p.position.row && pos.col === p.position.col
             )
           ),
+          boardSize,
           newCapturedPositions
         );
 
@@ -120,16 +122,17 @@ const getCapturesFromPosition = (
 export const getValidMoves = (
   piece: Piece,
   pieces: Piece[],
-  requireCapture: boolean = true
+  requireCapture: boolean = true,
+  boardSize: number = 8
 ): Move[] => {
   // First, check for captures
-  const captures = getCapturesFromPosition(piece.position, piece, pieces);
+  const captures = getCapturesFromPosition(piece.position, piece, pieces, boardSize);
   console.log('Possible captures:', captures);
 
   // Check if any piece has captures available
   const anyCaptures = pieces
     .filter(p => p.color === piece.color)
-    .some(p => getCapturesFromPosition(p.position, p, pieces).length > 0);
+    .some(p => getCapturesFromPosition(p.position, p, pieces, boardSize).length > 0);
 
   // If captures are available and required, only return captures
   if (anyCaptures && requireCapture) {
@@ -137,16 +140,16 @@ export const getValidMoves = (
   }
 
   // If no captures are required or available, get normal moves
-  const normalMoves = getNormalMoves(piece, pieces);
+  const normalMoves = getNormalMoves(piece, pieces, boardSize);
   console.log('Normal moves:', normalMoves);
 
   return captures.length > 0 ? captures : normalMoves;
 };
 
 // Check if a piece should be promoted to king
-export const shouldPromoteToKing = (piece: Piece): boolean => {
+export const shouldPromoteToKing = (piece: Piece, boardSize: number = 8): boolean => {
   return (
-    (piece.color === 'black' && piece.position.row === DEFAULT_BOARD_SIZE - 1) ||
+    (piece.color === 'black' && piece.position.row === boardSize - 1) ||
     (piece.color === 'white' && piece.position.row === 0)
   );
 };
@@ -154,9 +157,10 @@ export const shouldPromoteToKing = (piece: Piece): boolean => {
 // Check if any piece of the given color has available captures
 export const hasAvailableCaptures = (
   pieces: Piece[],
-  color: 'black' | 'white'
+  color: 'black' | 'white',
+  boardSize: number = 8
 ): boolean => {
   return pieces
     .filter((piece) => piece.color === color)
-    .some((piece) => getValidMoves(piece, pieces, true).length > 0);
+    .some((piece) => getValidMoves(piece, pieces, true, boardSize).length > 0);
 }; 

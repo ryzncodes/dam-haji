@@ -8,14 +8,16 @@ interface GamePieceProps {
   piece: Piece;
   isSelected?: boolean;
   onClick?: () => void;
+  size?: string;
 }
 
-const GamePiece = ({ piece, isSelected, onClick }: GamePieceProps) => {
+const GamePiece = ({ piece, isSelected, onClick, size = 'w-12 h-12' }: GamePieceProps) => {
   return (
     <div
       onClick={onClick}
       className={cn(
-        'w-12 h-12 rounded-full cursor-pointer transition-all duration-200',
+        size,
+        'rounded-full cursor-pointer transition-all duration-200',
         piece.color === 'black' ? PIECE_COLORS.BLACK : PIECE_COLORS.WHITE,
         'shadow-md hover:shadow-lg dark:shadow-neutral-900',
         piece.color === 'black' 
