@@ -3,6 +3,10 @@ import { expect, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import * as matchers from '@testing-library/jest-dom/matchers'
 import { vi } from 'vitest'
+import React from 'react'
+
+// Make React available globally
+global.React = React
 
 expect.extend(matchers)
 
