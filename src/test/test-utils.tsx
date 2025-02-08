@@ -3,24 +3,33 @@ import { render } from '@testing-library/react'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import SupabaseProvider from '@/components/providers/supabase-provider'
 
-function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <SupabaseProvider>
+interface ProvidersProps {
+  children: React.ReactNode
+  withTheme?: boolean
+}
+
+function Providers({ children, withTheme = false }: ProvidersProps) {
+  let content = children
+
+  if (withTheme) {
+    content = (
       <ThemeProvider
         attribute="class"
         defaultTheme="system"
         enableSystem
         disableTransitionOnChange
       >
-        {children}
+        {content}
       </ThemeProvider>
-    </SupabaseProvider>
-  )
+    )
+  }
+
+  return <SupabaseProvider>{content}</SupabaseProvider>
 }
 
-function renderWithProviders(ui: ReactElement) {
+function renderWithProviders(ui: ReactElement, { withTheme = false } = {}) {
   return render(ui, {
-    wrapper: Providers,
+    wrapper: ({ children }) => <Providers withTheme={withTheme}>{children}</Providers>,
   })
 }
 
